@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./data/nginx/conf.d:/etc/nginx/conf.d
+      - ./data/nginx/html:/usr/share/nginx/html
+      - ./logs/nginx:/var/log/nginx
+      - ./data/acme/cert:/etc/letsencrypt
+      - ./data/acme/www:/var/www/acme
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - sh.acme.autoload.nginx
+    links:
+      - v2ray:v2ray #连接v2ray容器，映射主机名，此处非常重要，如果没有这个映射nginx就无法连接v2ray的websocket服务
+      - webssh:webssh #连接webssh容器
+  
+  v2ray:
+    image: v2ray/official:latest
+    container_name: v2ray
+    environment:
+      - TZ=Asia/Shanghai
+    restart: always
+    command: v2ray -config=/etc/v2ray/config.json
+    volumes:
+      - ./data/v2ray:/etc/v2ray
+      - ./logs/v2ray:/var/log/v2ray
+    expose:
+      - "30909" #开放端口给容器，不对外开放
+
+  webssh:
+    image: jakewalker/webssh:latest
+    container_name: webssh
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+    #覆写入口。因前置了nginx代理，并通过cloudflare中转，所以设置相关参数。xheaders是为了cloudflare中转，wpintvl是为了长连接保活
+    entrypoint: ["wssh", "--address=0.0.0.0", "--port=8888", "--xheaders=False", "--wpintvl=10"]
+    expose:
+      - "8888" #开放端口给容器，不对外开放    
