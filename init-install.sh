@@ -141,7 +141,7 @@ acme(){
 	if  [ ! -n "$1" ] ;then
 		read -arp "请输入域名，多个域名请用空格风格:" domains
 	else
-		domains = ("$1")
+		domains = ( "$1" )
 	fi
 	
 	domain_args=""

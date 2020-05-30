@@ -16,7 +16,7 @@ su -l v2ray
 
 3、安装git，并clone本repo。
 ```
-sudo yum -y intall git
+sudo yum -y install git
 
 git clone https://github.com/gsoyond/docker-v2ray-webssh.git
 ```

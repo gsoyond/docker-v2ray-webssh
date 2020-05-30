@@ -34,7 +34,7 @@ services:
       - "30909" #开放端口给容器，不对外开放
 
   webssh:
-    image: jakewalker/webssh:latest
+    image: buarle/webssh:latest
     container_name: webssh
     restart: always
     environment:
