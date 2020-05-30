@@ -89,13 +89,20 @@ check_system() {
 }
 
 install_bbr() {
+	has_su_root=0
 	if ! [ $(id -u) = 0 ]; then
-	   echo "BBR 加速脚本需要以root用户运行"
-	   exit 1
+	   echo "BBR 加速脚本需要以root用户运行。现在切换到root用户..."
+	   su -l root
+	   has_su_root=1
 	fi
 	
 	[ -f "bbr.sh" ] && rm -f ./bbr.sh
     wget -N --no-check-certificate -O bbr.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh" && chmod +x bbr.sh && ./bbr.sh
+
+	if [[ 1 -eq ${has_su_root} && $(id -u) = 0 ]]; then
+        $(logout)
+		echo "已退出root用户登录."
+    fi
 }
 
 init_env(){
