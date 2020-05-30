@@ -10,7 +10,7 @@ services:
       - ./data/nginx/html:/usr/share/nginx/html
       - ./logs/nginx:/var/log/nginx
       - ./data/acme/cert:/etc/letsencrypt
-      - ./data/acme/www:/var/www/acme
+      - ./data/acme/www/.well-known/acme-challenge:/var/www/acme
     ports:
       - "80:80"
       - "443:443"

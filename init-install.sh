@@ -1,5 +1,10 @@
 #!/bin/bash
 
+cd "$(
+    cd "$(dirname "$0")" || exit
+    pwd
+)" || exit
+
 #fonts color
 Green="\033[32m"
 Red="\033[31m"
@@ -15,7 +20,7 @@ Error="${Red}[错误]${Font}"
 
 
 #配置信息
-base_dir="$HOME/docker-v2ray"
+base_dir=$(cd "$(dirname "$0")";pwd)
 data_dir="$base_dir/data"
 log_dir="$base_dir/logs"
 nginx_base_dir="$data_dir/nginx"
@@ -62,6 +67,9 @@ check_system() {
 		fi
 	fi
 
+	source '/etc/os-release'
+	VERSION=$(echo "${VERSION}" | awk -F "[()]" '{print $2}')
+
     if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]]; then
         echo -e "${OK} ${GreenBG} 当前系统为 Centos ${VERSION_ID} ${VERSION} ${Font}"
         INS="${SUDO} yum"
@@ -90,13 +98,13 @@ check_system() {
 
 install_bbr() {
 	has_su_root=0
-	if ! [ $(id -u) = 0 ]; then
+	if ! [[ $(id -u) = 0 ]]; then
 	   echo "BBR 加速脚本需要以root用户运行。现在切换到root用户..."
 	   su -l root
 	   has_su_root=1
 	fi
 	
-	[ -f "bbr.sh" ] && rm -f ./bbr.sh
+	[[ -f "bbr.sh" ]] && rm -f ./bbr.sh
     wget -N --no-check-certificate -O bbr.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh" && chmod +x bbr.sh && ./bbr.sh
 
 	if [[ 1 -eq ${has_su_root} && $(id -u) = 0 ]]; then
@@ -109,39 +117,62 @@ init_env(){
 	#安装必要的环境，包括docker、docker-compose	
 	echo -e "${OK} ${GreenBG} 安装必要的环境，包括docker、docker-compose、amce.sh、qrencode ${Font}"
 	
-	curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
-	judge "安装docker"
+	if [[ -x "$(command -v docker)" ]]; then
+		echo -e "${OK} ${GreenBG} docker已存在。 ${Font}"
+	else
+		curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
+
+		#如果是非root用户，需要加入docker组，才能操作docker
+		if ! [[ $(id -u) = 0 ]]; then
+			cur_user=$USER
+			${SUDO} gpasswd -a ${cur_user} docker
+			#需要退出重新登录后才能生效
+			$(logout)
+			$(su - l "${cur_user}")
+		fi
+		judge "安装docker"	
+	fi	
 	
-	${SUDO} gpasswd -a $USER docker
 	${SUDO} systemctl start docker
 	${SUDO} systemctl enable docker
 	
-	${SUDO} curl -L "https://github.com/docker/compose/releases/download/1.25.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
-		&& ${SUDO} chmod +x /usr/local/bin/docker-compose \
-		&& ${SUDO} ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-	judge "安装docker-compose"
-	
-	curl https://get.acme.sh | sh
-	judge "安装acme.sh"
-	
+	if [[ -x "$(command -v docker-compose)" ]]; then
+		echo -e "${OK} ${GreenBG} docker-compose已存在。 ${Font}"
+	else
+		${SUDO} curl -L "https://github.com/docker/compose/releases/download/1.25.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
+			&& ${SUDO} chmod +x /usr/local/bin/docker-compose \
+			&& ${SUDO} ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+		judge "安装docker-compose"
+	fi
+
+	if [[ -x "$(command -v $HOME/.acme.sh/acme.sh)" ]]; then
+		echo -e "${OK} ${GreenBG} acme.sh已存在。 ${Font}"
+	else	
+		curl https://get.acme.sh | sh
+		judge "安装acme.sh"
+	fi
+
 	${INS} -y install qrencode
     judge "安装 qrencode"
 	
 	#建立必要的路径 
-	[ ! -d ${nginx_www_dir} ] && mkdir -p ${nginx_www_dir}
-	[ ! -d ${nginx_config_dir} ] && mkdir -p ${nginx_config_dir}
-	[ ! -d ${v2ray_config_dir} ] && mkdir -p ${v2ray_config_dir}
-	[ ! -d ${nginx_log_dir} ] && mkdir -p ${nginx_log_dir}
-	[ ! -d ${v2ray_log_dir} ] && mkdir -p ${v2ray_log_dir}
+	[[ ! -d ${nginx_www_dir} ]] && mkdir -p ${nginx_www_dir}
+	[[ ! -d ${nginx_config_dir} ]] && mkdir -p ${nginx_config_dir}
+	[[ ! -d ${v2ray_config_dir} ]] && mkdir -p ${v2ray_config_dir}
+	[[ ! -d ${nginx_log_dir} ]] && mkdir -p ${nginx_log_dir}
+	[[ ! -d ${v2ray_log_dir} ]] && mkdir -p ${v2ray_log_dir}
+
+	[[ ! -d "${acme_www_dir}/.well-known/acme-challenge" ]] && mkdir -p "${acme_www_dir}.well-known/acme-challenge"
+	[[ ! -d ${acme_cert_dir} ]] && mkdir -p ${acme_cert_dir}
 	
 }
 
 acme(){
 	echo -e "${GreenBG} 开始申请域名认证证书 ${Font}"
-	if  [ ! -n "$1" ] ;then
+	if  [[ ! -n "$1" ]] ;then
 		read -arp "请输入域名，多个域名请用空格风格:" domains
 	else
-		domains = ( "$1" )
+		domains=( "$1" )
 	fi
 	
 	domain_args=""
@@ -150,7 +181,7 @@ acme(){
 	done
 	main_domain="${domains[0]}"
 
-	if [ -d "${acme_cert_dir}/${main_domain}" ]; then
+	if [[ -d "${acme_cert_dir}/${main_domain}" ]]; then
 	  read -p "$domains 的证书已存在，是否确认申请并覆盖？(y/N) " decision
 	  if [ "$decision" != "Y" ] && [ "$decision" != "y" ]; then
 		exit
@@ -160,17 +191,13 @@ acme(){
 	echo -e "${GreenBG} 开始域名认证，${domains} ${Font}"
 	#启动nginx容器
 	echo "### Starting nginx ..."
-	docker-compose up --force-recreate -d nginx
-	
-	! [ -d ${acme_www_dir} ] && mkdir -p ${acme_www_dir}
-	
-	acme.sh --issue ${domain_args} -w ${acme_www_dir} -k ec-256 --force 
-	judge "域名证书申请"
-	
-	! [ -d ${acme_cert_dir} ] && mkdir -p ${acme_cert_dir}
+	docker-compose up --force-recreate -d nginx	
 		
+	"$HOME"/.acme.sh/acme.sh --issue ${domain_args} -w ${acme_www_dir} -k ec-256 --force 
+	judge "域名证书申请"
+			
 	echo -e "${GreenBG} 开始安装证书 ${Font}"
-	acme.sh --install-cert ${domain_args} \
+	"$HOME"/.acme.sh/acme.sh --install-cert ${domain_args} \
 		--key-file       ${acme_cert_dir}/${main_domain}/key.pem  \
 		--fullchain-file ${acme_cert_dir}/${main_domain}/fullchain.pem \
 		--reloadcmd     "docker exec nginx nginx -s reload"
@@ -248,6 +275,7 @@ show_information() {
 }
 
 install(){
+	echo
 	echo -e "${OK} ${GreenBG} 本脚本将使用docker-compose安装nginx、v2ray和webssh，完成tls+ws的配置。 ${Font}"
 	echo -e "${OK} ${GreenBG} 请准备好2个域名，一个给v2ray，一个给ssh。 ${Font}"
 	echo -e "${OK} ${GreenBG} 先输入v2ray的配置信息： ${Font}"
@@ -263,18 +291,19 @@ install(){
 	echo -e "${OK} ${GreenBG} 再输入webssh的配置信息： ${Font}"
 	read -rp "请输入用于webssh的域名信息:" domain_webssh
 	read -rp "为加强webssh站点安全，采用Basic认证。请设置用户名:" webssh_auth_username
-	read -rp "请设置密码:" webssh_auth_password
+	read -rp "请设置密码(最长8个字符):" webssh_auth_password
 	
 	printf "${webssh_auth_username}:$(openssl passwd -crypt ${webssh_auth_password})\n" >> ${nginx_webssh_basic_auth_file}
 	echo
 	
 	echo -e "${GreenBG} 修改nginx和v2ray配置信息 ${Font}"
-	sed -i 's/your_domain/${domain_v2ray}/g' ${nginx_v2ray_config_file}	
-	sed -i 's/your_domain/${domain_webssh}/g' ${nginx_webssh_config_file}
-	sed -i 's/your_ws_path/${camouflage}/g' ${nginx_v2ray_config_file}
-	sed -i 's/your_ws_path/${camouflage}/g' ${v2ray_config_file}
-	sed -i 's/your_uuid/${UUID}/g' ${v2ray_config_file}
-	sed -i 's/your_alterId/${alterID}/g' ${v2ray_config_file}
+	sed -i "s/your_domain/${domain_v2ray}/g" ${nginx_v2ray_config_file}	
+	sed -i "s/your_domain/${domain_webssh}/g" ${nginx_webssh_config_file}
+	sed -i "s/your_ws_path/${camouflage}/g" ${nginx_v2ray_config_file}
+	
+	sed -i "s/your_ws_path/${camouflage}/g" ${v2ray_config_file}
+	sed -i "s/your_uuid/${UUID}/g" ${v2ray_config_file}
+	sed -i "s/your_alterId/${alterID}/g" ${v2ray_config_file}
 	
 	
 	echo -e "${GreenBG} 开始认证v2ray的域名 ${domain_v2ray} ${Font}"
