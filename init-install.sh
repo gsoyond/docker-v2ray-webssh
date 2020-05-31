@@ -31,7 +31,7 @@ nginx_config_dir="$nginx_base_dir/conf.d"
 nginx_v2ray_config_file="$nginx_config_dir/v2ray.conf"
 nginx_webssh_config_file="$nginx_config_dir/webssh.conf"
 nginx_webssh_basic_auth_file="$nginx_config_dir/passwd"
-nginx_log_dir="$log_dir/nignx"
+nginx_log_dir="$log_dir/nginx"
 v2ray_base_dir="$data_dir/v2ray"
 v2ray_config_dir="$v2ray_base_dir"
 v2ray_config_file="$v2ray_config_dir/config.json"
@@ -240,6 +240,7 @@ EOF
 vmess_qr_link_image() {
     vmess_link="vmess://$(base64 -w 0 $v2ray_qr_config_file)"
     {
+		echo -e "${OK} ${GreenBG} V2ray客户端连接信息 ${Font}"
         echo -e "$Red V2ray二维码: $Font"
         echo -n "${vmess_link}" | qrencode -o - -t utf8
         echo -e "${Red} URL导入链接: ${vmess_link} ${Font}"
@@ -252,7 +253,7 @@ info_extraction() {
 
 basic_information() {
     {
-        echo -e "${OK} ${GreenBG} V2ray+ws+tls 安装成功"
+        echo -e "${OK} ${GreenBG} V2ray+ws+tls 安装成功 ${Font}"
         echo -e "${Red} V2ray 配置信息 ${Font}"
         echo -e "${Red} 地址（address）:${Font} $(info_extraction '\"add\"') "
         echo -e "${Red} 端口（port）：${Font} $(info_extraction '\"port\"') "
@@ -263,7 +264,7 @@ basic_information() {
         echo -e "${Red} 伪装类型（type）：${Font} none "
         echo -e "${Red} 路径（不要落下/）：${Font} $(info_extraction '\"path\"') "
         echo -e "${Red} 底层传输安全：${Font} tls "
-		echo -e "${OK} ${GreenBG} webssh 安装成功"
+		echo -e "${OK} ${GreenBG} webssh 安装成功 ${Font}"
 		echo -e "${Red} webssh 配置信息 ${Font}"
         echo -e "${Red} 地址（address）:${Font} $domain_webssh "
 		echo -e "${Red} Basic认证用户名（username）:${Font} $webssh_auth_username "
@@ -303,7 +304,7 @@ install(){
 	sed -i "s/your_domain/${domain_webssh}/g" ${nginx_webssh_config_file}
 	sed -i "s/your_ws_path/${camouflage}/g" ${nginx_v2ray_config_file}
 
-	sed -i "/\"path\"/c \\\t  \"path\":\"${camouflage}\"" ${v2ray_config_file}
+	sed -i "/\"path\"/c \\\t  \"path\":\"\\${camouflage}\\\"" ${v2ray_config_file}
 	sed -i "/\"alterId\"/c \\\t  \"alterId\":${alterID}" ${v2ray_config_file}
 	sed -i "/\"id\"/c \\\t  \"id\":\"${UUID}\"," ${v2ray_config_file}
 		
@@ -335,6 +336,9 @@ install(){
 	## 配置信息写入
 	vmess_qr_config_tls_ws
 	basic_information
+	## 生成vmess链接和二维码
+	vmess_qr_link_image
+	show_information
 }
 
 menu() {
