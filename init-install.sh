@@ -163,7 +163,7 @@ init_env(){
 	[[ ! -d ${nginx_log_dir} ]] && mkdir -p ${nginx_log_dir}
 	[[ ! -d ${v2ray_log_dir} ]] && mkdir -p ${v2ray_log_dir}
 
-	[[ ! -d "${acme_www_dir}/.well-known/acme-challenge" ]] && mkdir -p "${acme_www_dir}/.well-known/acme-challenge"
+	[[ ! -d ${acme_www_dir} ]] && mkdir -p ${acme_www_dir}
 	[[ ! -d ${acme_cert_dir} ]] && mkdir -p ${acme_cert_dir}
 	
 }
@@ -202,7 +202,7 @@ acme(){
 	"$HOME"/.acme.sh/acme.sh --install-cert ${domain_args} \
 		--key-file       ${acme_cert_dir}/${main_domain}/key.pem  \
 		--fullchain-file ${acme_cert_dir}/${main_domain}/fullchain.pem \
-		--reloadcmd     "docker exec nginx nginx -s reload"
+		--ecc --force --reloadcmd "docker exec nginx nginx -s reload"
 	judge "域名证书安装"
 	echo -e "${OK} ${GreenBG} 证书安装路径为${acme_cert_dir}/${main_domain} ${Font}" 
 }
@@ -215,14 +215,14 @@ start_server(){
 	  exit 1
 	fi
 	
-	docker-compose up
+	docker-compose up -d
 }
 
 vmess_qr_config_tls_ws() {
     cat >${v2ray_qr_config_file} <<-EOF
 {
   "v": "2",
-  "ps": "glx_${domain_v2ray}",
+  "ps": "gso_${domain_v2ray}",
   "add": "${domain_v2ray}",
   "port": "443",
   "id": "${UUID}",
@@ -303,9 +303,9 @@ install(){
 	sed -i "s/your_domain/${domain_webssh}/g" ${nginx_webssh_config_file}
 	sed -i "s/your_ws_path/${camouflage}/g" ${nginx_v2ray_config_file}
 
-	sed -i "s/your_ws_path/${camouflage}/g" ${v2ray_config_file}
-	sed -i "s/your_uuid/${UUID}/g" ${v2ray_config_file}
-	sed -i "s/your_alterId/${alterID}/g" ${v2ray_config_file}
+	sed -i "/\"path\"/c \\\t  \"path\":\"${camouflage}\"" ${v2ray_config_file}
+	sed -i "/\"alterId\"/c \\\t  \"alterId\":${alterID}" ${v2ray_config_file}
+	sed -i "/\"id\"/c \\\t  \"id\":\"${UUID}\"," ${v2ray_config_file}
 		
 	#为保证nginx能顺利启动，先为每个域名生成自签证书
 	cert_path=${acme_cert_dir}/${domain_v2ray}
@@ -324,7 +324,7 @@ install(){
 
 	echo -e "${GreenBG} 开始认证v2ray的域名 ${domain_v2ray} ${Font}"
 	acme ${domain_v2ray}
-	echo -e "${GreenBG} 开始认证wenssh的域名 ${domain_webssh} ${Font}"
+	echo -e "${GreenBG} 开始认证webssh的域名 ${domain_webssh} ${Font}"
 	acme ${domain_webssh}
 	echo
 	
