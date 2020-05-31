@@ -149,6 +149,7 @@ init_env(){
 		echo -e "${OK} ${GreenBG} acme.sh已存在。 ${Font}"
 	else	
 		curl https://get.acme.sh | sh
+		"$HOME"/.acme.sh/acme.sh --upgrade --auto-upgrade
 		judge "安装acme.sh"
 	fi
 
@@ -162,7 +163,7 @@ init_env(){
 	[[ ! -d ${nginx_log_dir} ]] && mkdir -p ${nginx_log_dir}
 	[[ ! -d ${v2ray_log_dir} ]] && mkdir -p ${v2ray_log_dir}
 
-	[[ ! -d "${acme_www_dir}/.well-known/acme-challenge" ]] && mkdir -p "${acme_www_dir}.well-known/acme-challenge"
+	[[ ! -d "${acme_www_dir}/.well-known/acme-challenge" ]] && mkdir -p "${acme_www_dir}/.well-known/acme-challenge"
 	[[ ! -d ${acme_cert_dir} ]] && mkdir -p ${acme_cert_dir}
 	
 }
@@ -188,10 +189,11 @@ acme(){
 	  fi
 	fi
 	
-	echo -e "${GreenBG} 开始域名认证，${domains} ${Font}"
+	echo -e "${GreenBG} 开始域名认证，${domains} ${Font}"	
 	#启动nginx容器
 	echo "### Starting nginx ..."
-	docker-compose up --force-recreate -d nginx	
+	docker-compose up -d nginx
+	docker-compose exec nginx nginx -s reload
 		
 	"$HOME"/.acme.sh/acme.sh --issue ${domain_args} -w ${acme_www_dir} -k ec-256 --force 
 	judge "域名证书申请"
@@ -202,7 +204,7 @@ acme(){
 		--fullchain-file ${acme_cert_dir}/${main_domain}/fullchain.pem \
 		--reloadcmd     "docker exec nginx nginx -s reload"
 	judge "域名证书安装"
-	echo -e "${OK} ${GreenBG} 证书安装路径为${nginx_cert_dir}/${main_domain} ${Font}" 
+	echo -e "${OK} ${GreenBG} 证书安装路径为${acme_cert_dir}/${main_domain} ${Font}" 
 }
 
 start_server(){
@@ -300,12 +302,26 @@ install(){
 	sed -i "s/your_domain/${domain_v2ray}/g" ${nginx_v2ray_config_file}	
 	sed -i "s/your_domain/${domain_webssh}/g" ${nginx_webssh_config_file}
 	sed -i "s/your_ws_path/${camouflage}/g" ${nginx_v2ray_config_file}
-	
+
 	sed -i "s/your_ws_path/${camouflage}/g" ${v2ray_config_file}
 	sed -i "s/your_uuid/${UUID}/g" ${v2ray_config_file}
 	sed -i "s/your_alterId/${alterID}/g" ${v2ray_config_file}
-	
-	
+		
+	#为保证nginx能顺利启动，先为每个域名生成自签证书
+	cert_path=${acme_cert_dir}/${domain_v2ray}
+	[[ ! -d ${cert_path} ]] && mkdir -p ${cert_path} 
+	openssl req -x509 -nodes -newkey rsa:1024 -days 1 \
+    	-keyout "$cert_path/key.pem" \
+    	-out "$cert_path/fullchain.pem" \
+    	-subj "/CN=localhost"
+
+	cert_path=${acme_cert_dir}/${domain_webssh}
+	[[ ! -d ${cert_path} ]] && mkdir -p ${cert_path} 
+	openssl req -x509 -nodes -newkey rsa:1024 -days 1 \
+    	-keyout "$cert_path/key.pem" \
+    	-out "$cert_path/fullchain.pem" \
+    	-subj "/CN=localhost"
+
 	echo -e "${GreenBG} 开始认证v2ray的域名 ${domain_v2ray} ${Font}"
 	acme ${domain_v2ray}
 	echo -e "${GreenBG} 开始认证wenssh的域名 ${domain_webssh} ${Font}"
