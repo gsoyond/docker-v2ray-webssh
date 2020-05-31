@@ -304,7 +304,7 @@ install(){
 	sed -i "s/your_domain/${domain_webssh}/g" ${nginx_webssh_config_file}
 	sed -i "s/your_ws_path/${camouflage}/g" ${nginx_v2ray_config_file}
 
-	sed -i "/\"path\"/c \\\t  \"path\":\"\\${camouflage}\\\"" ${v2ray_config_file}
+	sed -i "/\"path\"/c \\\t  \"path\":\"/${camouflage}/\"" ${v2ray_config_file}
 	sed -i "/\"alterId\"/c \\\t  \"alterId\":${alterID}" ${v2ray_config_file}
 	sed -i "/\"id\"/c \\\t  \"id\":\"${UUID}\"," ${v2ray_config_file}
 		
