@@ -21,7 +21,7 @@ services:
       - webssh:webssh #连接webssh容器
   
   v2ray:
-    image: v2ray/official:latest
+    image: gists/v2ray:latest
     container_name: v2ray
     environment:
       - TZ=Asia/Shanghai
